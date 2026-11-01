@@ -10,3 +10,4 @@ __pycache__/
 .venv-serving/
 .env
 /olist_warehouse_project_v02.zip
+/olist_warehouse_starter/
