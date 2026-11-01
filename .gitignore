@@ -1,0 +1,12 @@
+/data/raw/
+/data/ods/
+/data/dwd/
+/data/dws/
+/data/ads/
+/reports/
+__pycache__/
+*.pyc
+.DS_Store
+.venv-serving/
+.env
+/olist_warehouse_project_v02.zip
