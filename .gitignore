@@ -3,6 +3,7 @@
 /data/dwd/
 /data/dws/
 /data/ads/
+/data/batches/
 /reports/
 __pycache__/
 *.pyc
@@ -11,3 +12,4 @@ __pycache__/
 .env
 /olist_warehouse_project_v02.zip
 /olist_warehouse_starter/
+/backups/
