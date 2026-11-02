@@ -12,6 +12,7 @@ from batch_manager import (
     now_utc,
     update_status,
 )
+from batch_paths import resolve_table_path
 
 REQUIRED_TABLES = {
     "daily_sales": "dt",
@@ -67,7 +68,12 @@ def validate_batch(batch_id):
 
         # 只能读取当前批次的指定ADS目录
         expected = (batch_ads_root / name).resolve()
-        actual = Path(info["path"]).resolve()
+
+        actual = resolve_table_path(
+            batch_id,
+            name,
+            info["path"]
+        )
 
         check(
             actual == expected,

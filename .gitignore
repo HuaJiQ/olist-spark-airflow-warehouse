@@ -13,3 +13,17 @@ __pycache__/
 /olist_warehouse_project_v02.zip
 /olist_warehouse_starter/
 /backups/
+# Airflow runtime data (database, logs, generated credentials)
+/airflow/state/
+
+# Local backup configuration
+/airflow/compose.yaml.bak
+/airflow/dags/compose.yaml
+/.gitignore.bak
+
+# VS Code local settings
+/.vscode/
+
+# Python bytecode cache
+__pycache__/
+*.pyc

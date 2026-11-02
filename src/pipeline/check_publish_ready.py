@@ -6,7 +6,7 @@ import pyarrow.dataset as ds
 
 from batch_manager import BATCH_ROOT, load_batch
 from validate_batch import REQUIRED_TABLES
-
+from batch_paths import resolve_table_path
 
 def check_publish_ready(batch_id):
     # 读取批次Manifest
@@ -49,7 +49,11 @@ def check_publish_ready(batch_id):
             batch_dir / "ads" / table_name
         ).resolve()
 
-        actual = Path(info["path"]).resolve()
+        actual = resolve_table_path(
+            batch_id,
+            table_name,
+            info["path"]
+        )
 
         if actual != expected:
             raise ValueError(

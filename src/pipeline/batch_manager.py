@@ -144,6 +144,15 @@ def record_table(batch_id, table_name, parquet_path):
 
     source = Path(parquet_path).resolve()
 
+    expected = (
+        BATCH_ROOT / batch_id / "ads" / table_name
+    ).resolve()
+
+    if source != expected:
+        raise ValueError(
+            f"Table path must belong to current batch: {expected}"
+        )
+
     if not source.is_dir():
         raise FileNotFoundError(
             f"Parquet directory not found: {source}"
@@ -157,7 +166,7 @@ def record_table(batch_id, table_name, parquet_path):
     quality_pass = row_count > 0
 
     manifest["tables"][table_name] = {
-        "path": str(source),
+        "path": source.relative_to(ROOT).as_posix(),
         "row_count": row_count,
         "quality_pass": quality_pass,
         "checked_at": now_utc(),
