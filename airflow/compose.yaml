@@ -16,3 +16,16 @@ services:
       - ../src:/workspace/src:ro
       - ../data/batches:/workspace/data/batches:rw
     restart: "no"
+  spark-runner:
+    image: spark:4.2.0-python3
+    container_name: olist-spark-runner
+    command:
+      - python3
+      - -u
+      - /workspace/jobs/spark_job_runner.py
+    mem_limit: 2g
+    cpus: 2
+    volumes:
+      - ../jobs:/workspace/jobs:ro
+      - ../data/dws:/workspace/data/dws:ro
+    restart: "no"
