@@ -1,9 +1,57 @@
+import argparse
+import re
+from pathlib import Path
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 
 
 def main():
+
+    # ===== 批次参数 =====
+    parser = argparse.ArgumentParser(
+        description="Build ADS category sales"
+    )
+
+    parser.add_argument(
+        "--batch-id",
+        default=None,
+        help="Optional batch ID for isolated output"
+    )
+
+    args = parser.parse_args()
+
+    if args.batch_id is not None:
+        if not re.fullmatch(
+            r"[A-Za-z0-9_-]{1,64}",
+            args.batch_id
+        ):
+            raise ValueError("Invalid batch_id")
+
+        ads_path = (
+            f"/workspace/data/batches/"
+            f"{args.batch_id}/ads/category_sales"
+        )
+
+        # 批次模式：禁止覆盖已经存在的输出
+        if Path(ads_path).exists():
+            raise FileExistsError(
+                f"Batch output already exists: {ads_path}"
+            )
+
+        write_mode = "errorifexists"
+
+    else:
+        # 普通模式：兼容原有输出路径
+        ads_path = "/workspace/data/ads/category_sales"
+        write_mode = "overwrite"
+
+    print(
+        f"[ADS CATEGORY OUTPUT] {ads_path}",
+        flush=True
+    )
+
+
     spark = (
         SparkSession.builder
         .appName("Olist-ADS-Category-Sales")
@@ -172,9 +220,9 @@ def main():
     
     # ===== 保存商品类别ADS表 =====
 
-    ads_path = "/workspace/data/ads/category_sales"
-
-    category_sales.write.mode("overwrite").parquet(ads_path)
+    category_sales.write.mode(write_mode).parquet(
+        ads_path
+    )
 
     saved_ads = spark.read.parquet(ads_path)
     saved_rows = saved_ads.count()

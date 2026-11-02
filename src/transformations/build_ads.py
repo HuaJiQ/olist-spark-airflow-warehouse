@@ -1,8 +1,39 @@
+import argparse
+import re
+from pathlib import Path
 
 from pyspark.sql import functions as F
 from pyspark.sql import SparkSession
 
 def main():
+    parser = argparse.ArgumentParser(
+        description="Build ADS daily sales"
+    )
+
+    parser.add_argument(
+        "--batch-id",
+        default=None,
+        help="Optional batch ID for isolated output"
+    )
+
+    args = parser.parse_args()
+
+    if args.batch_id is not None:
+        if not re.fullmatch(
+            r"[A-Za-z0-9_-]{1,64}",
+            args.batch_id
+        ):
+            raise ValueError("Invalid batch_id")
+
+        ads_path = (
+            f"/workspace/data/batches/"
+            f"{args.batch_id}/ads/daily_sales"
+        )
+    else:
+        ads_path = "/workspace/data/ads/daily_sales"
+
+    print(f"[ADS OUTPUT] {ads_path}", flush=True)
+
     # 1. 创建SparkSession
     spark = (
         SparkSession.builder
@@ -185,8 +216,23 @@ def main():
     print("Delivered without items:",delivered_without_items)
 
     # ===== 写入ADS =====
-    ads_path = "/workspace/data/ads/daily_sales"
-    daily_sales.write.mode("overwrite").parquet(ads_path)
+    if args.batch_id is not None:
+        target = Path(ads_path)
+
+        if target.exists():
+            raise FileExistsError(
+                f"Batch output already exists: {ads_path}"
+            )
+
+        # 新批次目录必须不存在，避免覆盖原数据
+        daily_sales.write.mode("errorifexists").parquet(
+            ads_path
+        )
+    else:
+        # 兼容之前的非批次运行方式
+        daily_sales.write.mode("overwrite").parquet(
+            ads_path
+        )
 
     # 读回验证
     saved_ads = spark.read.parquet(ads_path)

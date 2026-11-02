@@ -1,9 +1,75 @@
+import argparse
+import re
+from pathlib import Path
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 
 
 def main():
+    # ===== 批次参数 =====
+    parser = argparse.ArgumentParser(
+        description="Build ADS customer profile and repurchase"
+    )
+
+    parser.add_argument(
+        "--batch-id",
+        default=None,
+        help="Optional batch ID for isolated output"
+    )
+
+    args = parser.parse_args()
+
+    if args.batch_id is not None:
+        if not re.fullmatch(
+            r"[A-Za-z0-9_-]{1,64}",
+            args.batch_id
+        ):
+            raise ValueError("Invalid batch_id")
+
+        base_path = (
+            f"/workspace/data/batches/{args.batch_id}/ads"
+        )
+
+        profile_path = (
+            f"{base_path}/customer_purchase_profile"
+        )
+
+        summary_path = (
+            f"{base_path}/customer_repurchase"
+        )
+
+        # 写入前预检查两个输出目录
+        for target_path in [profile_path, summary_path]:
+            if Path(target_path).exists():
+                raise FileExistsError(
+                    f"Batch output already exists: {target_path}"
+                )
+
+        write_mode = "errorifexists"
+
+    else:
+        # 兼容以前的普通运行模式
+        profile_path = (
+            "/workspace/data/ads/customer_purchase_profile"
+        )
+
+        summary_path = (
+            "/workspace/data/ads/customer_repurchase"
+        )
+
+        write_mode = "overwrite"
+
+    print(
+        f"[ADS CUSTOMER OUTPUT] {profile_path}",
+        flush=True
+    )
+
+    print(
+        f"[ADS REPURCHASE OUTPUT] {summary_path}",
+        flush=True
+    )
+
     spark = (
         SparkSession.builder
         .appName("Olist-ADS-Customer-Repurchase")
@@ -212,12 +278,7 @@ def main():
 
     
     # ===== 写入客户购买画像 =====
-
-    profile_path = (
-        "/workspace/data/ads/customer_purchase_profile"
-    )
-
-    customer_profile.write.mode("overwrite").parquet(
+    customer_profile.write.mode(write_mode).parquet(
         profile_path
     )
 
@@ -231,10 +292,9 @@ def main():
     )
 
     # ===== 写入整体复购指标 =====
-
-    summary_path = ("/workspace/data/ads/customer_repurchase")
-
-    repurchase_summary.write.mode("overwrite").parquet(summary_path)
+    repurchase_summary.write.mode(write_mode).parquet(
+        summary_path
+    )
 
     saved_summary = spark.read.parquet(summary_path)
 
