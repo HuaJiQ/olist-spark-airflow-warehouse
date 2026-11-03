@@ -97,7 +97,9 @@ with DAG(
 
     @task(retries=0)
     def prepare_batch():
-        run_id = get_current_context()["run_id"]
+        context = get_current_context()
+        run_id = context["run_id"]
+        dag_id = context["dag"].dag_id
         digest = hashlib.sha256(
             run_id.encode("utf-8")
         ).hexdigest()[:16]
@@ -112,7 +114,10 @@ with DAG(
             )
 
         run_manager(
-            "create", "--batch-id", batch_id
+            "create",
+            "--batch-id", batch_id,
+            "--dag-id", dag_id,
+            "--run-id", run_id,
         )
         run_manager(
             "status",

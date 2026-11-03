@@ -59,8 +59,8 @@ def save_manifest(path, manifest):
     temp_path.replace(path)
 
 
-def create_batch(batch_id):
-    """创建新批次。"""
+def create_batch(batch_id, source=None):
+    """创建新批次，可选记录创建来源。"""
 
     path = get_manifest_path(batch_id)
 
@@ -78,6 +78,25 @@ def create_batch(batch_id):
         "tables": {},
         "error": None,
     }
+
+    if source is not None:
+        if not isinstance(source, dict):
+            raise ValueError("source must be a dictionary")
+
+        if (
+            source.get("system") != "airflow"
+            or not isinstance(source.get("dag_id"), str)
+            or not source["dag_id"].strip()
+            or not isinstance(source.get("run_id"), str)
+            or not source["run_id"].strip()
+        ):
+            raise ValueError("Invalid Airflow source metadata")
+
+        manifest["source"] = {
+            "system": "airflow",
+            "dag_id": source["dag_id"],
+            "run_id": source["run_id"],
+        }
 
     save_manifest(path, manifest)
     print(f"[CREATED] {batch_id}")
@@ -211,11 +230,28 @@ def main():
     parser.add_argument("--error")
     parser.add_argument("--table")
     parser.add_argument("--path")
+    parser.add_argument("--dag-id")
+    parser.add_argument("--run-id")
 
     args = parser.parse_args()
 
     if args.action == "create":
-        create_batch(args.batch_id)
+        # dag_id和run_id必须同时提供
+        if bool(args.dag_id) != bool(args.run_id):
+            parser.error(
+                "--dag-id and --run-id must be provided together"
+            )
+
+        source = None
+
+        if args.dag_id and args.run_id:
+            source = {
+                "system": "airflow",
+                "dag_id": args.dag_id,
+                "run_id": args.run_id,
+            }
+
+        create_batch(args.batch_id, source=source)
 
     elif args.action == "status":
         if not args.to:
