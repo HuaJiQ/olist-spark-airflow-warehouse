@@ -1,4 +1,3 @@
-
 services:
   postgres:
     image: postgres:17
@@ -24,6 +23,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
+    networks:
+      - default
+      - airflow_shared
 volumes:
   postgres_data:
+networks:
+  airflow_shared:
+    external: true
+    name: olist-airflow_default
