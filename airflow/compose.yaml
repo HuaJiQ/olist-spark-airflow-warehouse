@@ -15,10 +15,12 @@ services:
       - ./state:/opt/airflow
       - ../src:/workspace/src:ro
       - ../data/batches:/workspace/data/batches:rw
-    restart: "no"
+    restart: unless-stopped
   spark-runner:
     image: spark:4.2.0-python3
     container_name: olist-spark-runner
+    group_add:
+      - "0"
     command:
       - python3
       - -u
@@ -27,5 +29,8 @@ services:
     cpus: 2
     volumes:
       - ../jobs:/workspace/jobs:ro
+      - ../src/transformations:/workspace/src/transformations:ro
       - ../data/dws:/workspace/data/dws:ro
-    restart: "no"
+      - ../data/dwd:/workspace/data/dwd:ro
+      - ../data/batches:/workspace/data/batches:rw
+    restart: unless-stopped
