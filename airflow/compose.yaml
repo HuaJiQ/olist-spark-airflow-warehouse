@@ -1,4 +1,4 @@
-﻿name: olist-airflow
+name: olist-airflow
 
 services:
   airflow:
@@ -10,12 +10,21 @@ services:
     environment:
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "True"
+      # 数据库连接参数：必须在environment下面
+      PGHOST: "olist-postgres"
+      PGPORT: "5432"
+      PGDATABASE: "olist_warehouse"
+      PGUSER: "olist"
+      OLIST_PG_PASSWORD_FILE: "/run/secrets/olist/pg_password.txt"
     volumes:
       - ./dags:/opt/airflow/dags
       - ./state:/opt/airflow
       - ../src:/workspace/src:ro
       - ../data/batches:/workspace/data/batches:rw
+      - ../src/serving:/workspace/src/serving:ro
+      - ./secrets/pg_password.txt:/run/secrets/olist/pg_password.txt:ro
     restart: unless-stopped
+
   spark-runner:
     image: spark:4.2.0-python3
     container_name: olist-spark-runner

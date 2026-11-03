@@ -1,5 +1,5 @@
-
 import argparse
+import os
 import sys
 from decimal import Decimal
 from getpass import getpass
@@ -18,6 +18,29 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src" / "serving"))
 from sync_ads_to_postgres import TABLES
 
+def get_database_config():
+    """兼容本地交互式运行和Airflow非交互式运行。"""
+
+    password_file = os.getenv("OLIST_PG_PASSWORD_FILE")
+
+    if password_file:
+        password = Path(password_file).read_text(
+            encoding="utf-8"
+        ).strip()
+
+        if not password:
+            raise ValueError("PostgreSQL password file is empty")
+    else:
+        password = getpass("PostgreSQL password: ")
+
+    return {
+        "host": os.getenv("PGHOST", "127.0.0.1"),
+        "port": int(os.getenv("PGPORT", "5432")),
+        "dbname": os.getenv("PGDATABASE", "olist_warehouse"),
+        "user": os.getenv("PGUSER", "olist"),
+        "password": password,
+        "connect_timeout": 10,
+    }
 
 def load_datasets(batch_id):
     datasets = {}
@@ -178,17 +201,7 @@ def publish(
         print("DRY RUN ONLY: no database changes", flush=True)
         return
 
-    password = getpass("PostgreSQL password: ")
-
-    # 连接上下文正常结束时提交，异常时回滚
-    with psycopg.connect(
-        host="127.0.0.1",
-        port=5432,
-        dbname="olist_warehouse",
-        user="olist",
-        password=password,
-        connect_timeout=10,
-    ) as conn:
+    with psycopg.connect(**get_database_config()) as conn:
 
         with conn.cursor() as cur:
 

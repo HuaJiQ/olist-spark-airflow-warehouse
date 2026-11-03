@@ -20,7 +20,8 @@ __pycache__/
 /airflow/compose.yaml.bak
 /airflow/dags/compose.yaml
 /.gitignore.bak
-
+# Local database credentials
+airflow/secrets/
 # VS Code local settings
 /.vscode/
 

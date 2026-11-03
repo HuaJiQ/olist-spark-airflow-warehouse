@@ -231,8 +231,156 @@ with DAG(
         )
         return batch_id
 
+    @task(retries=0)
+    def validate_batch(batch_id: str):
+        """调用M5完整质量门禁。"""
+
+        command = [
+            "python",
+            "/workspace/src/pipeline/validate_batch.py",
+            "--batch-id",
+            batch_id,
+        ]
+
+        print(
+            f"[AIRFLOW] Validating batch={batch_id}",
+            flush=True,
+        )
+
+        subprocess.run(command, check=True)
+
+        print(
+            f"[AIRFLOW] Batch validated: {batch_id}",
+            flush=True,
+        )
+
+        return batch_id
+
+    @task(retries=0)
+    def check_publish_ready(batch_id: str):
+        """确认批次具备发布资格，但不修改数据库。"""
+
+        command = [
+            "python",
+            "/workspace/src/pipeline/check_publish_ready.py",
+            "--batch-id",
+            batch_id,
+        ]
+
+        print(
+            f"[AIRFLOW] Checking publication readiness: {batch_id}",
+            flush=True,
+        )
+
+        subprocess.run(command, check=True)
+
+        print(
+            f"[AIRFLOW] Publication readiness PASS: {batch_id}",
+            flush=True,
+        )
+
+        return batch_id
+
+    @task(retries=0)
+    def publish_batch(batch_id: str):
+        """复用M5的PostgreSQL事务发布程序。"""
+
+        command = [
+            "python",
+            "/workspace/src/pipeline/publish_batch.py",
+            "--batch-id",
+            batch_id,
+            "--apply",
+        ]
+
+        print(
+            f"[AIRFLOW] Publishing batch={batch_id}",
+            flush=True,
+        )
+
+        subprocess.run(
+            command,
+            check=True,
+            timeout=600,
+        )
+
+        print(
+            f"[AIRFLOW] Publication completed: {batch_id}",
+            flush=True,
+        )
+
+        return batch_id
+
+    @task(retries=0)
+    def verify_publication(batch_id: str):
+        """确认Manifest与PostgreSQL当前批次一致。"""
+
+        import os
+        import psycopg
+
+        manifest_path = (
+            BATCH_ROOT / batch_id / "manifest.json"
+        )
+
+        with manifest_path.open(
+            encoding="utf-8"
+        ) as f:
+            manifest = json.load(f)
+
+        if manifest["status"] != "PUBLISHED":
+            raise RuntimeError(
+                f"Manifest not PUBLISHED: {batch_id}"
+            )
+
+        # 复用M5发布程序的数据库连接配置。
+        import sys
+        sys.path.insert(
+            0, "/workspace/src/pipeline"
+        )
+        from publish_batch import get_database_config
+
+        with psycopg.connect(
+            **get_database_config()
+        ) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT batch_id "
+                    "FROM ads_current_batch "
+                    "WHERE singleton_id = 1"
+                )
+                row = cur.fetchone()
+
+                if not row or row[0] != batch_id:
+                    raise RuntimeError(
+                        f"Current DB batch mismatch: {row}"
+                    )
+
+                cur.execute(
+                    "SELECT status "
+                    "FROM ads_publication_log "
+                    "WHERE batch_id = %s",
+                    (batch_id,),
+                )
+                log_row = cur.fetchone()
+
+                if not log_row or log_row[0] != "PUBLISHED":
+                    raise RuntimeError(
+                        f"Publication log mismatch: {log_row}"
+                    )
+
+        print(
+            f"[AIRFLOW] PUBLICATION VERIFIED: {batch_id}",
+            flush=True,
+        )
+
+        return batch_id
+
     batch = prepare_batch()
     daily = build_daily_sales(batch)
     customer = build_customer_ads(daily)
     category = build_category_sales(customer)
-    record_all_ads(category)
+    recorded = record_all_ads(category)
+    validated = validate_batch(recorded)
+    ready = check_publish_ready(validated)
+    published = publish_batch(ready)
+    verify_publication(published)
