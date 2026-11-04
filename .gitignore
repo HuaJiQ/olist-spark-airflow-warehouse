@@ -28,3 +28,24 @@ airflow/secrets/
 # Python bytecode cache
 __pycache__/
 *.pyc
+# Local data and generated warehouse outputs
+/data/
+
+# Python cache
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Spark temporary files
+.sparkStaging/
+_metastore_db/
+metastore_db/
+derby.log
+
+# Local logs
+*.log
+
+# Local environments
+.venv/
+venv/
+.env
