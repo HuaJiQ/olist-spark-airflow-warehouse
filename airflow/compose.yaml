@@ -1,4 +1,4 @@
-name: olist-airflow
+﻿name: olist-airflow
 
 services:
   airflow:
@@ -6,7 +6,7 @@ services:
     container_name: olist-airflow
     command: standalone
     ports:
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:18080:8080"
     environment:
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "True"
@@ -24,7 +24,6 @@ services:
       - ../src/serving:/workspace/src/serving:ro
       - ./secrets/pg_password.txt:/run/secrets/olist/pg_password.txt:ro
     restart: unless-stopped
-
   spark-runner:
     image: spark:4.2.0-python3
     container_name: olist-spark-runner
@@ -37,9 +36,19 @@ services:
     mem_limit: 2g
     cpus: 2
     volumes:
+      # Runner程序
       - ../jobs:/workspace/jobs:ro
+      # 原有M1-M8转换程序
       - ../src/transformations:/workspace/src/transformations:ro
+      # 新增M10程序
+      - ../src/m10:/workspace/src/m10:ro
+      # 原有DWD、DWS数据
       - ../data/dws:/workspace/data/dws:ro
       - ../data/dwd:/workspace/data/dwd:ro
+      # 新增M9订单财务汇总
+      - ../data/m9/dws:/workspace/data/m9/dws:ro
+      # 旧ADS，用于回归验证
+      - ../data/ads:/workspace/data/ads:ro
+      # 批次隔离输出，允许写入
       - ../data/batches:/workspace/data/batches:rw
     restart: unless-stopped

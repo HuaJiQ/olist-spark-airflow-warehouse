@@ -90,3 +90,53 @@ flowchart LR
 | Docker网络连通 | `POSTGRES NETWORK: PASS` |
 
 本文件不包含源数据文件或用户本地密钥。
+
+## F. M9—M11销售主题扩展
+
+M9—M11在原有M6发布链路之外，增加独立的订单财务建模与销售主题调度流程。
+
+```mermaid
+flowchart TD
+    A[M9 订单事实及商品支付明细] --> B[M9 订单财务汇总]
+    B --> C[M10 日销售DWS]
+    C --> D[M10 月度销售ADS]
+
+    E[Airflow olist_m10_sales] --> F[Spark Runner]
+    F --> C
+    F --> D
+    E --> G[回归验证]
+    G --> H[最终质量门禁]
+    D --> H
+```
+
+### F.1 数据粒度
+
+- 订单财务汇总：`order_id`唯一。
+- 日销售DWS：购买日期`dt`唯一。
+- 月度销售ADS：购买月份`month`唯一。
+
+### F.2 批次输出目录
+
+```text
+data/batches/<batch_id>/m10/
+├── dws/
+│   └── sales_daily/
+└── ads/
+    └── sales_monthly/
+```
+
+上游日销售和下游月度销售使用相同的`batch_id`，防止不同批次的数据混用。
+
+### F.3 执行与验收
+
+Airflow DAG `olist_m10_sales`包含五个任务：
+
+`prepare_batch → build_daily → build_monthly → validate_sales → verify_outputs`
+
+2026-11-04实际运行结果：5/5任务成功，DAG状态SUCCESS。
+
+### F.4 与原有PostgreSQL链路的关系
+
+新增M10流程独立运行，尚未调用原有`publish_batch.py`发布月度销售ADS。
+
+因此本项目已有的PostgreSQL原子发布、Manifest发布恢复能力属于原有M6链路，不应直接归因于M10新建DAG。

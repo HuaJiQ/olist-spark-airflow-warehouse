@@ -4,10 +4,9 @@ import subprocess
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-
 SPARK_SUBMIT = "/opt/spark/bin/spark-submit"
 
-# 只允许执行登记过的作业
+# 只允许执行登记过的Spark作业
 ALLOWED_JOBS = {
     "olist_dws_smoke":
         "/workspace/jobs/m6_spark_smoke.py",
@@ -20,49 +19,75 @@ ALLOWED_JOBS = {
 
     "build_category_sales":
         "/workspace/src/transformations/build_ads_category.py",
+
+    # M10销售主题：新批次构建和验证
+    "build_m10_sales_daily":
+        "/workspace/src/m10/build_sales_daily.py",
+
+    "build_m10_sales_monthly":
+        "/workspace/src/m10/build_sales_monthly.py",
+
+    "validate_m10_sales":
+        "/workspace/src/m10/validate_sales_consistency.py",
 }
+# 以下作业必须提供合法的批次ID
 BATCH_JOBS = {
-        "build_daily_sales",
-        "build_customer_ads",
-        "build_category_sales",
-    }
+    "build_daily_sales",
+    "build_customer_ads",
+    "build_category_sales",
+    "build_m10_sales_daily",
+    "build_m10_sales_monthly",
+    "validate_m10_sales",
+}
 run_lock = threading.Lock()
 
 def execute_job(job_name, batch_id=None):
+    # 1. 作业必须存在于白名单
     if job_name not in ALLOWED_JOBS:
         raise ValueError("Job is not allowed")
 
+    # 2. 构造基本Spark命令
     command = [
         SPARK_SUBMIT,
         "--master", "local[2]",
         ALLOWED_JOBS[job_name],
     ]
 
+    # 3. 对批次作业追加批次参数
     if job_name in BATCH_JOBS:
-        if not isinstance(batch_id, str) or not re.fullmatch(
-            r"[A-Za-z0-9_-]{1,64}", batch_id
+        if (
+            not isinstance(batch_id, str)
+            or not re.fullmatch(
+                r"[A-Za-z0-9_-]{1,64}",
+                batch_id
+            )
         ):
             raise ValueError("Invalid batch_id")
 
-        command.extend(["--batch-id", batch_id])
+        command.extend([
+            "--batch-id",
+            batch_id
+        ])
 
     elif batch_id is not None:
-        raise ValueError("This job does not accept batch_id")
-        if not isinstance(batch_id, str) or not re.fullmatch(
-            r"[A-Za-z0-9_-]{1,64}", batch_id
-        ):
-            raise ValueError("Invalid batch_id")
+        raise ValueError(
+            "This job does not accept batch_id"
+        )
 
-        command.extend(["--batch-id", batch_id])
-
-    elif batch_id is not None:
-        raise ValueError("This job does not accept batch_id")
-
+    # 4. 打印真正执行的命令
     print(
-        f"[RUNNER] Starting job={job_name}, batch_id={batch_id}",
+        "[RUNNER COMMAND]",
+        " ".join(command),
         flush=True
     )
 
+    print(
+        f"[RUNNER] Starting job={job_name}, "
+        f"batch_id={batch_id}",
+        flush=True
+    )
+
+    # 5. 执行Spark作业
     result = subprocess.run(
         command,
         capture_output=True,
@@ -74,6 +99,7 @@ def execute_job(job_name, batch_id=None):
     print(result.stdout[-4000:], flush=True)
     print(result.stderr[-4000:], flush=True)
 
+    # 6. 返回执行结果
     return {
         "job": job_name,
         "batch_id": batch_id,
